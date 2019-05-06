@@ -1,0 +1,127 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2014             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+
+import fritzconnection as fc
+import sys
+import getopt
+
+
+def usage():
+    sys.stderr.write("""Check_MK Fritz!Box Agent
+
+USAGE: agent_fritzbox [OPTIONS] HOST
+       agent_fritzbox -h
+
+ARGUMENTS:
+  HOST                          Host name or IP address of your Fritz!Box
+
+OPTIONS:
+  -h, --help                    Show this help message and exit
+  --debug                       Debug mode: let Python exceptions come through
+""")
+
+
+short_options = 'h:tu:p:d'
+long_options = ['help', 'timeout=', 'debug', 'user=', 'password=']
+
+host_address = None
+opt_debug = False
+opt_user = None
+opt_password = None
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
+except getopt.GetoptError, err:
+    sys.stderr.write("%s\n" % err)
+    sys.exit(1)
+
+for o, a in opts:
+    if o in ['--debug']:
+        opt_debug = True
+    elif o in ['-u', '--user']:
+        opt_user = a
+    elif o in ['-p', '--password']:
+        opt_password = a
+    elif o in ['-h', '--help']:
+        usage()
+        sys.exit(0)
+
+if len(args) == 1:
+    host_address = args[0]
+elif not args:
+    sys.stderr.write("ERROR: No host given.\n")
+    sys.exit(1)
+else:
+    sys.stderr.write("ERROR: Please specify exactly one host.\n")
+    sys.exit(1)
+
+services = {
+        'DeviceInfo': ['GetInfo'],
+        'Hosts': ['GetHostNumberOfEntries'],
+        'LANConfigSecurity': ['X_AVM-DE_GetCurrentUser'],
+        'LANEthernetInterfaceConfig': ['GetInfo',
+                                       'GetStatistics'],
+        'LANHostConfigManagement': ['GetInfo'],
+        'Time': ['GetInfo'], 
+        'UserInterface': ['GetInfo'],
+        'WANCommonInterfaceConfig': ['GetCommonLinkProperties',
+                                     'GetTotalBytesSent',
+                                     'GetTotalPacketsSent',
+                                     'GetTotalBytesReceived',
+                                     'GetTotalPacketsReceived' ],
+        'WANIPConnection': ['GetInfo', ],
+        'WANDSLInterfaceConfig': ['GetInfo',
+                                  'GetStatisticsTotal'],
+        'WANDSLLinkConfig': ['GetInfo',
+                             'GetStatistics'],
+        'WANPPPConnection': ['GetInfo'],
+        'WLANConfiguration': ['GetInfo',
+                              'GetStatistics'],
+        }
+
+try:
+    connection = fc.FritzConnection(user=opt_user, password=opt_password, address=host_address)
+except:
+    raise
+
+try:
+    version = 'I don\'t know'
+    for servicename, actions in services.iteritems():
+        print '<<<fritzbox_%s:sep(124)>>>' % servicename
+        for action in actions:
+            output = connection.call_action(servicename, action)
+            for key, value in output.iteritems():
+                if key == 'NewSoftwareVersion':
+                    version = value
+                print ("%s|%s" % (key, value)).encode('utf_8')
+    print '<<<check_mk>>>'
+    print 'AgentOS: Fritz!OS'
+    print 'Version: %s' % version
+except:
+    if opt_debug:
+        raise
+    pass
