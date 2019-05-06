@@ -1,0 +1,19 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+
+# Author: Marcel Arentz <gdspd_you@open-one.de>
+
+def inventory_fritzbox_hosts(info):
+    if info:
+        return [(None, {})]
+
+def check_fritzbox_hosts(_no_item, _no_params, info):
+    val = info[0][1]
+    return 0, 'Number of registered hosts: %s' % val, [('fritzbox_Hosts', val)]
+
+check_info['fritzbox_Hosts'] = {
+        'inventory_function': inventory_fritzbox_hosts,
+        'check_function': check_fritzbox_hosts,
+        'service_description': 'FritzBox Hosts',
+        'has_perfdata': True,
+        }
