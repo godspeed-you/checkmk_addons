@@ -1,7 +1,9 @@
 # First we declare all the sql statements, that we  possibly will use
 
+################################################################################
 # SQL for Performance information
 ################################################################################
+
 Function sql_performance {
      if ($DBVERSION -gt 101000) {
         $query_performance = @'
@@ -40,10 +42,10 @@ Function sql_performance {
     }
 }
 
-
 ################################################################################
 # SQL for Tablespace information
 ################################################################################
+
 Function sql_tablespaces {
     if ($DBVERSION -gt 121000) {
         $query_tablespace = @'
@@ -347,13 +349,10 @@ select * from v$instance;
 
 }
 
-
-
-
-
 ################################################################################
 # SQL for Dataguard Statistics
 ################################################################################
+
 Function sql_dataguard_stats {
      if ($DBVERSION -gt 102000) {
         $query_dataguard_stats = @'
@@ -403,10 +402,10 @@ Function sql_dataguard_stats {
     }
 }
 
-
 ################################################################################
 # SQL for Recovery status
 ################################################################################
+
 Function sql_recovery_status {
     if ($DBVERSION -gt 121000) {
         $query_recovery_status = @'
@@ -476,10 +475,10 @@ Function sql_recovery_status {
     }
 }
 
-
 ################################################################################
 # SQL for RMAN Backup information
 ################################################################################
+
 Function sql_rman {
     if ($DBVERSION -gt 121000) {
         $query_rman = @'
@@ -629,11 +628,10 @@ Function sql_rman {
     }
 }
 
-
-
 ################################################################################
 # SQL for Flash Recovery Area information
 ################################################################################
+
 Function sql_recovery_area {
     if ($DBVERSION -gt 102000) {
         $query_recovery_area = @'
@@ -652,12 +650,10 @@ Function sql_recovery_area {
     }
 }
 
-
-
-
 ################################################################################
 # SQL for UNDO information
 ################################################################################
+
 Function sql_undostat {
     if ($DBVERSION -gt 121000) {
         $query_undostat = @'
@@ -725,6 +721,7 @@ Function sql_undostat {
 ################################################################################
 # SQL for resumable information
 ################################################################################
+
 Function sql_resumable {
     $query_resumable = @'
           prompt <<<oracle_resumable:sep(124)>>>;
@@ -751,10 +748,10 @@ Function sql_resumable {
     Write-Output $query_resumable
 }
 
-
 ################################################################################
 # SQL for scheduler_jobs information
 ################################################################################
+
 Function sql_jobs {
     if ($DBVERSION -gt 121000) {
         $query_scheduler_jobs = @'
@@ -847,6 +844,7 @@ Function sql_jobs {
 ################################################################################
 # SQL for Tablespace quotas information
 ################################################################################
+
 Function sql_ts_quotas {
     $query_ts_quotas = @'
         prompt <<<oracle_ts_quotas:sep(124)>>>;
@@ -869,6 +867,7 @@ Function sql_ts_quotas {
 ################################################################################
 # SQL for Oracle Version information
 ################################################################################
+
 Function sql_version {
     $query_version = @'
         prompt <<<oracle_version:sep(124)>>>;
@@ -883,6 +882,7 @@ Function sql_version {
 ################################################################################
 # SQL for sql_instance information
 ################################################################################
+
 Function sql_instance {
     if ($ORACLE_SID.substring(0,1) -eq "+") {
         $query_instance = @'
@@ -980,6 +980,7 @@ Function sql_instance {
 ################################################################################
 # SQL for sql_sessions information
 ################################################################################
+
 Function sql_sessions {
     if ($DBVERSION -gt 121000) {
         $query_sessions = @'
@@ -1021,6 +1022,7 @@ Function sql_sessions {
 ################################################################################
 # SQL for sql_processes information
 ################################################################################
+
 Function sql_processes {
     $query_processes = @'
         prompt <<<oracle_processes:sep(124)>>>;
@@ -1037,6 +1039,7 @@ Function sql_processes {
 ################################################################################
 # SQL for sql_logswitches information
 ################################################################################
+
 Function sql_logswitches {
     $query_logswitches = @'
         prompt <<<oracle_logswitches:sep(124)>>>;
@@ -1055,6 +1058,7 @@ Function sql_logswitches {
 ################################################################################
 # SQL for database lock information
 ################################################################################
+
 Function sql_locks {
     if ($DBVERSION -gt 121000) {
         $query_locks = @'
@@ -1196,6 +1200,7 @@ set serverout off
 ################################################################################
 # SQL for long active session information
 ################################################################################
+
 Function sql_longactivesessions {
     if ($DBVERSION -gt 121000) {
         $query_longactivesessions = @'
@@ -1271,6 +1276,7 @@ Function sql_longactivesessions {
 ################################################################################
 # SQL for sql_logswitches information
 ################################################################################
+
 Function sql_asm_diskgroup {
      if ($DBVERSION -gt 112000) {
         $query_asm_diskgroup = @'
