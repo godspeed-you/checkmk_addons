@@ -5,6 +5,10 @@
 ################################################################################
 
 Function sql_performance {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
      if ($DBVERSION -gt 101000) {
         $query_performance = @'
         prompt <<<oracle_performance:sep(124)>>>;
@@ -37,6 +41,7 @@ Function sql_performance {
                    ||'|'|| b.reloads
                    ||'|'|| b.invalidations
             from v$instance i, V$librarycache b;
+
 '@
         Write-Output $query_performance
     }
@@ -47,6 +52,10 @@ Function sql_performance {
 ################################################################################
 
 Function sql_tablespaces {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     if ($DBVERSION -gt 121000) {
         $query_tablespace = @'
         prompt <<<oracle_tablespaces:sep(124)>>>;
@@ -189,7 +198,7 @@ Function sql_tablespaces {
                 end;
             END;
 /
-            set serverout off
+            set serverout off;
 
 '@
         Write-Output $query_tablespace
@@ -309,7 +318,7 @@ Function sql_tablespaces {
               end;
           END;
 /
-          set serverout off
+          set serverout off;
 
 '@
         Write-Output $query_tablespace
@@ -354,6 +363,10 @@ select * from v$instance;
 ################################################################################
 
 Function sql_dataguard_stats {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
      if ($DBVERSION -gt 102000) {
         $query_dataguard_stats = @'
           prompt <<<oracle_dataguard_stats:sep(124)>>>;
@@ -407,6 +420,10 @@ Function sql_dataguard_stats {
 ################################################################################
 
 Function sql_recovery_status {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     if ($DBVERSION -gt 121000) {
         $query_recovery_status = @'
           prompt <<<oracle_recovery_status:sep(124)>>>;
@@ -480,6 +497,10 @@ Function sql_recovery_status {
 ################################################################################
 
 Function sql_rman {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     if ($DBVERSION -gt 121000) {
         $query_rman = @'
           prompt <<<oracle_rman:sep(124)>>>;
@@ -620,8 +641,7 @@ Function sql_rman {
                        where b.target = 'PRIMARY'
                          and b.SCHEDULE = 'ACTIVE'
                           )
-                group by d.name, case when a.backup_count > 0 then 1 else 0 end)
-;
+                group by d.name, case when a.backup_count > 0 then 1 else 0 end);
 
 '@
         Write-Output $query_rman
@@ -633,6 +653,10 @@ Function sql_rman {
 ################################################################################
 
 Function sql_recovery_area {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     if ($DBVERSION -gt 102000) {
         $query_recovery_area = @'
           prompt <<<oracle_recovery_area:sep(124)>>>;
@@ -655,6 +679,10 @@ Function sql_recovery_area {
 ################################################################################
 
 Function sql_undostat {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     if ($DBVERSION -gt 121000) {
         $query_undostat = @'
           prompt <<<oracle_undostat:sep(124)>>>;
@@ -723,6 +751,10 @@ Function sql_undostat {
 ################################################################################
 
 Function sql_resumable {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     $query_resumable = @'
           prompt <<<oracle_resumable:sep(124)>>>;
           select upper(i.INSTANCE_NAME)
@@ -753,6 +785,10 @@ Function sql_resumable {
 ################################################################################
 
 Function sql_jobs {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     if ($DBVERSION -gt 121000) {
         $query_scheduler_jobs = @'
           prompt <<<oracle_jobs:sep(124)>>>;
@@ -812,7 +848,7 @@ Function sql_jobs {
               end;
           END;
           /
-          set serverout off
+          set serverout off;
 
 '@
         Write-Output $query_scheduler_jobs
@@ -846,6 +882,10 @@ Function sql_jobs {
 ################################################################################
 
 Function sql_ts_quotas {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     $query_ts_quotas = @'
         prompt <<<oracle_ts_quotas:sep(124)>>>;
         select upper(d.NAME)
@@ -860,6 +900,7 @@ Function sql_ts_quotas {
                          ||'|||'
                   from v$database d
                   order by 1;
+
 '@
     Write-Output $query_ts_quotas
 }
@@ -869,12 +910,17 @@ Function sql_ts_quotas {
 ################################################################################
 
 Function sql_version {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     $query_version = @'
         prompt <<<oracle_version:sep(124)>>>;
         select upper(i.INSTANCE_NAME)
         	  || '|' || banner
         	  from v$version, v$instance i
         	  where banner like 'Oracle%';
+
 '@
     Write-Output $query_version
 }
@@ -884,7 +930,12 @@ Function sql_version {
 ################################################################################
 
 Function sql_instance {
-    if ($ORACLE_SID.substring(0,1) -eq "+") {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
+    #if ($ORACLE_SID.substring(0,1) -eq "+") {
+    if ("This" -eq "That") {
         $query_instance = @'
           prompt <<<oracle_instance:sep(124)>>>;
           select upper(i.instance_name)
@@ -898,8 +949,7 @@ Function sql_instance {
                      || '|' || 'ASM'
                      || '|' || 'NO'
                      || '|' || i.instance_name
-                from v$instance i
-;
+                from v$instance i;
 
 '@
     } else {
@@ -982,6 +1032,10 @@ Function sql_instance {
 ################################################################################
 
 Function sql_sessions {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     if ($DBVERSION -gt 121000) {
         $query_sessions = @'
            prompt <<<oracle_sessions:sep(124)>>>;
@@ -1024,14 +1078,18 @@ Function sql_sessions {
 ################################################################################
 
 Function sql_processes {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     $query_processes = @'
         prompt <<<oracle_processes:sep(124)>>>;
         select upper(i.instance_name)
                           || '|' || CURRENT_UTILIZATION
                           || '|' || ltrim(rtrim(LIMIT_VALUE))
                    from v$resource_limit, v$instance i
-                   where RESOURCE_NAME = 'processes'
-                   ;
+                   where RESOURCE_NAME = 'processes';
+
 '@
     Write-Output $query_processes
 }
@@ -1041,6 +1099,10 @@ Function sql_processes {
 ################################################################################
 
 Function sql_logswitches {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     $query_logswitches = @'
         prompt <<<oracle_logswitches:sep(124)>>>;
         select upper(i.instance_name)
@@ -1049,8 +1111,8 @@ Function sql_logswitches {
                         (select count(1) logswitches
                          from v$loghist h , v$instance i
                          where h.first_time > sysdate - 1/24
-                         and h.thread# = i.instance_number)
-                        ;
+                         and h.thread# = i.instance_number);
+
 '@
     Write-Output $query_logswitches
 }
@@ -1060,6 +1122,10 @@ Function sql_logswitches {
 ################################################################################
 
 Function sql_locks {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     if ($DBVERSION -gt 121000) {
         $query_locks = @'
           prompt <<<oracle_locks:sep(124)>>>;
@@ -1145,6 +1211,10 @@ Function sql_locks {
 }
 
 Function sql_locks_old {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     if ($DBVERSION -gt 101000) {
         $query_locks = @'
           prompt <<<oracle_locks:sep(124)>>>;
@@ -1190,7 +1260,7 @@ begin
     end;
 END;
 /
-set serverout off
+set serverout off;
 
 '@
         Write-Output $query_locks
@@ -1202,6 +1272,10 @@ set serverout off
 ################################################################################
 
 Function sql_longactivesessions {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
     if ($DBVERSION -gt 121000) {
         $query_longactivesessions = @'
           prompt <<<oracle_longactivesessions:sep(124)>>>;
@@ -1265,8 +1339,7 @@ Function sql_longactivesessions {
               union all
               select upper(i.instance_name)
                      || '||||||||'
-              from v$instance i
-              ;
+              from v$instance i;
 
 '@
         Write-Output $query_longactivesessions
@@ -1278,6 +1351,10 @@ Function sql_longactivesessions {
 ################################################################################
 
 Function sql_asm_diskgroup {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [int]$DBVERSION
+    )
      if ($DBVERSION -gt 112000) {
         $query_asm_diskgroup = @'
           prompt <<<oracle_asm_diskgroup:sep(124)>>>;
@@ -1294,8 +1371,8 @@ Function sql_asm_diskgroup {
                      || '|' || offline_disks
                      || '|' || voting_files
                      || '|' || name || '/'
-                from v$asm_diskgroup
-                ;
+                from v$asm_diskgroup;
+
 '@
         Write-Output $query_asm_diskgroup
     } elseif ($DBVERSION -gt 101000) {
@@ -1315,6 +1392,7 @@ Function sql_asm_diskgroup {
                      || '|' || 'N'
                      || '|' || name || '/'
                 from v$asm_diskgroup;
+
 '@
         Write-Output $query_asm_diskgroup
     }
@@ -1327,73 +1405,36 @@ Function Write-DebugOutput {
     Param(
         [string]$Message
     )
-    if ($DEBUG -gt 0) {
-        $MYTIME=Get-Date -Format o
-        Write-Output "${MYTIME} DEBUG:${DEBUG_MESSAGE}"
+    $LogFile = "$MK_TEMPDIR\mk_oracle.log"
+    $MyTime=Get-Date -Format o
+    if (!(Test-Path -Path $LogFile)) {
+        "${MyTime}: Starting new run of mk_oracle.ps1" | Set-Content $LogFile
     }
+    if ($DEBUG -gt 0) {"${MyTime}: ${Message}" | Add-Content $LogFile}
 }
 
 # Set basic variables which can be modified by sub functions
-Write-DebugOutput -Message "Set up some basic variables"
 Set-Variable -Name SYNC_SECTIONS -Scope Script -Value @("instance", "sessions", "logswitches", "undostat", "recovery_area", "processes", "recovery_status", "longactivesessions", "dataguard_stats", "performance")
 Set-Variable -Name SYNC_ASM_SECTIONS -Scope Script -Value @("instance")
 Set-Variable -Name ASYNC_SECTIONS -Scope Script -Value @("tablespaces", "rman", "jobs", "ts_quotas", "resumable", "locks")
 Set-Variable -Name ASYNC_ASM_SECTIONS -Scope Script -Value @("asm_diskgroup")
 Set-Variable -Name DEBUG -Scope Script -Value 0
 Set-Variable -Name CACHE_MAXAGE -Scope Script -Value 600
-Set-Variable -Name ONLY_SIDS - Scope Script -Value @()
-
-Function Read-Config {
-    Write-DebugOutput -Message "Fetch MK_CONFDIR"
-    if (!$env:MK_CONFDIR) {
-        Set-Variable -Name MK_CONFDIR -Value "C:\Program Files (x86)\check_mk\config"
-    }
-    if (!$env:MK_TEMPDIR) {
-        Set-Variable -Name MK_TEMPDIR -Scope Script -Value "C:\Program Files (x86)\check_mk\temp"
-    }
-
-    # Assign Custom Variables
-    Set-Variable -Name ConfigFile -Value "${MK_CONFDIR}\mk_oracle_cfg.ps1"
-    if (Test-Path -Path "$ConfigFile") {
-        Write-DebugOutput "${ConfigFile} found, reading"
-        . "${ConfigFile}"
-    } else {
-        Write-DebugOutput "${ConfigFile} not found"
-    }
-}
+Set-Variable -Name ONLY_SIDS -Scope Script -Value @()
 
 Function Write-DummySections {
     Write-DebugOutput -Message "Write dummy sections"
     Set-Variable -Name DummySections -Value (New-Object system.collections.arraylist)
-    $DummySections.Add($SYNC_SECTIONS)
-    $DummySections.Add($ASYNC_SECTIONS)
-    $DummySections.Add($SYNC_ASM_SECTIONS)
-    $DummySections.Add($ASYNC_ASM_SECTIONS)
+    $DummySections.Add($SYNC_SECTIONS) | Out-Null
+    $DummySections.Add($ASYNC_SECTIONS) | Out-Null
+    $DummySections.Add($SYNC_ASM_SECTIONS) | Out-Null
+     $DummySections.Add($ASYNC_ASM_SECTIONS) | Out-Null
 
-    ForEach($Section in $DummySections) {
-        Write-Output "<<<oracle_${section}>>>"
+    ForEach($SectionType in $DummySections) {
+        ForEach($Section in $SectionType) {
+            Write-Output "<<<oracle_${section}>>>"
+        }
     }
-
-#    if ( $SYNC_SECTIONS.count -gt 0) {
-#        foreach ($section in $SYNC_SECTIONS) {
-#            Write-Output "<<<oracle_${section}>>>"
-#        }
-#    }
-#    if ( $ASYNC_SECTIONS.count -gt 0) {
-#        foreach ($section in $ASYNC_SECTIONS) {
-#            Write-Output "<<<oracle_${section}>>>"
-#        }
-#    }
-#    if ( $SYNC_ASM_SECTIONS.count -gt 0) {
-#        foreach ($section in $SYNC_ASM_SECTIONS) {
-#            Write-Output "<<<oracle_${section}>>>"
-#        }
-#    }
-#    if ( $ASYNC_ASM_SECTIONS.count -gt 0) {
-#        foreach ($section in $ASYNC_ASM_SECTIONS) {
-#            Write-Output "<<<oracle_${section}>>>"
-#        }
-#    }
 }
 
 Function Get-OracleHome {
@@ -1410,16 +1451,16 @@ Function Get-DBVersion {
         [Parameter(Mandatory=$true)]
         [PSObject]$SID
     )
-    Return ((Get-SqlPrefix -Type "Version") | sqplus -L -s "${SID.connect}")
+    Return ((Get-SqlPrefix -Type "Version") | sqlplus -L -s "$($SID.connect)")
 }
 
 Function Check-Variable {
     Param(
         [string]$MyVariable
     )
-    $MyVariable = (Get-Variable -Name $MyVariable -ErrorAction SilentlyContinue)
+    $CheckedVariable = (Get-Variable -Name $MyVariable -ErrorAction SilentlyContinue)
     if ($null -ne $MyVariable) {
-        Return $MyVariable
+        Return $CheckedVariable
     } else {
         Return $null
     }
@@ -1449,20 +1490,21 @@ Function New-InstanceObject {
 }
 
 Function Get-SqlPrefix {
-    Params(
+    Param(
         [Parameter(Mandatory=$true)]
         [string]$Type
     )
     if ($Type -eq "Query") {
-        Return @"
+        Return @'
         set pages 0 trimspool on;
         set linesize 1024;
         set feedback off;
         whenever OSERROR EXIT failure;
         whenever SQLERROR EXIT failure;
-"@
+
+'@
     } elseif ($Type -eq "Version") {
-        Return @"
+        Return @'
         whenever sqlerror exit failure rollback;
         whenever oserror exit failure rollback;
         SET TRIMOUT ON
@@ -1475,7 +1517,8 @@ Function Get-SqlPrefix {
         set feedback off
         select replace(version,'.','') from v$instance;
         exit;
-"@
+
+'@
     }
 }
 
@@ -1488,29 +1531,22 @@ Function Run-SqlStatement {
         [Parameter(Mandatory=$true)]
         [bool]$Async,
         [Parameter(Mandatory=$true)]
-        [string]$SID
+        [PSObject]$SID
     )
     Write-DebugOutput -Message "Run sql statements of $Banner"
-    Write-DebugOutput -Message "Using this connection string: ${SID.connect}"
-    $env:ORACLE_SID=$SID.name
-#    $SQLPrefix = @"
-#    set pages 0 trimspool on;
-#    set linesize 1024;
-#    set feedback off;
-#    whenever OSERROR EXIT failure;
-#    whenever SQLERROR EXIT failure;
-#
-#"@
+    $env:ORACLE_SID = $SID.name
+
     $SQLQuery = (Get-SqlPrefix -Type "Query") + $Statement
 
-    $OutputPath = $MK_TEMPDIR + "\" + "$Banner.${SID.name}.txt"
+    $OutputPath = $MK_TEMPDIR + "\" + "$Banner.$($SID.name).txt"
 
     if ($Async -And (Test-Path -Path "$OutputPath")) {
         Write-DebugOutput -Message "Found cache of async sections"
         $FileAge = (Get-Item $OutputPath).LastWriteTime
         $MaxAge = New-Timespan -Days 0 -Hours 0 -Minutes ($CACHE_MAXAGE / 60)
         if (((Get-Date) - $FileAge) -lt $MaxAge) {
-            cat $OutputPath
+            Write-DebugOutput -Message "Async sections still valid. Using cached data of $OutputPath"
+            $QueryResult = Get-Content $OutputPath
         }
         $RunAsync = $false # Cache is valid. No need for an update
     } elseif ($Async) {
@@ -1522,33 +1558,21 @@ Function Run-SqlStatement {
         $SqlError = $false
 
         # Run the SQL queries
-        if ($Async -And $RunAsync) {
-            Write-DebugOutput -Message "Running async sections as background task"
-            $AsyncJob = Start-Job -name $Banner -ScriptBlock {
-                $SQLQuery | sqlplus -L -s "${SID.connect}" | Set-Content $OutputPath
-            }
-            Write-DebugOutput -Message "Started task with name $Banner"
-            Receive-Job -Job $AsyncJob
-            Write-DebugOutput - Message "Received result from task $Banner"
-            Stop-Job -Name $Banner
-            Write-DebugOutput -Message "Stopped task $Banner"
-        } else {
-            Write-DebugOutput -Message "Running sync sections"
-            $QueryResult = ($SQLQuery | sqplus -L -s "${SID.connect}")
+        if (($Async -And $RunAsync) -Or !$Async) {
+            Write-DebugOutput -Message "Running $Banner"
+            $QueryResult = ($SQLQuery | sqlplus -L -s "$($SID.connect)")
         }
 
         # Check exit Codes and prepare Output accordingly
         if ($LastExitCode -eq 0) {
             Write-DebugOutput -Message "Completed without errors. Writing Output to $Outputpath"
             $QueryResult | Set-Content $OutputPath
-            #cat $OutputPath
             Write-Output $QueryResult
         } else {
             Write-DebugOutput -Message "Completed with errors. Preparing Output and write it to $Outputpath"
-            $QueryResult = "${SID.name}|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
+            $QueryResult = "$($SID.name)|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
             $QueryResult | Set-Content $OutputPath
             Write-Output "<<<oracle_instance:sep(124)>>>"
-            #cat $OutputPath
             Write-Output $QueryResult
             $SqlError = $true
         }
@@ -1556,29 +1580,42 @@ Function Run-SqlStatement {
         # Take care, that if the SQL queries fail, we still get an accordingly prepared Output
         if (!$SqlError) {
             Write-DebugOutput -Message "Did not complete. Preparing output and write it to $Outputpath"
-            $QueryResult = "${SID.name}|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
+            Write-DebugOutput -Message "Original error message: $QueryResult"
+            $QueryResult = "$($SID.name)|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
             $QueryResult | Set-Content $OutputPath
             Write-Output "<<<oracle_instance:sep(124)>>>"
-            #cat $OutputPath
             Write-Output $QueryResult
             $SqlError = $true
         }
     }
 }
 
+# Read Config
+#Write-DebugOutput -Message "Fetch MK_CONFDIR"
+if (!$env:MK_CONFDIR) {
+    Set-Variable -Name MK_CONFDIR -Value "C:\Program Files (x86)\check_mk\config"
+}
+if (!$env:MK_TEMPDIR) {
+    Set-Variable -Name MK_TEMPDIR -Scope Script -Value "C:\Program Files (x86)\check_mk\temp"
+}
 
+# Assign Custom Variables
+Set-Variable -Name ConfigFile -Value "${MK_CONFDIR}\mk_oracle_cfg.ps1"
+if (Test-Path -Path "$ConfigFile") {
+    Write-DebugOutput "${ConfigFile} found, reading"
+    . ${ConfigFile}
+} else {
+    Write-DebugOutput "${ConfigFile} not found"
+}
 
-# get a list of all running Oracle Instances
+# Get a list of all running Oracle Instances
 $RunningInstances=(Get-Service -Name "Oracle*Service*" -include "OracleService*", "OracleASMService*" | Where-Object {$_.status -eq "Running"})
-Write-DebugOutput -Message "Found instances: $RunningInstances"
+Write-DebugOutput -Message "Found instances: $($RunningInstances.DisplayName)"
 
 # the following line ensures that the output of the files generated by calling
 # Oracle SQLplus through Powershell are not limited to 80 character width. The
 # 80 character width limit is the default
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (512, 150)
-
-#$DBVERSION = get_dbversion_software
-#Write-DebugOutput "Value of DBVERSION software=${DBVERSION}"
 
 Write-DummySections
 
@@ -1592,31 +1629,31 @@ if (($RunningInstances | Measure-Object).count -eq 0) {
 ####################################################################################
 
 # Prepare Connects to instances
-$Instances=@()
-#$ASM_Instances=@()
-Read-Config
+Set-Variable -Name Instances -Value (New-Object system.collections.arraylist)
+
 ForEach($Instance in $RunningInstances) {
     $SID = New-InstanceObject
-
+    Write-DebugOutput -Message "Instance: $($Instance.Name)"
     # Set Instance nam, default sections and home
-    if ($Instance.name -match "OracleASMService") {
+    if ($Instance.Name -like "OracleASMService*") {
         $SID.asm = $true
-        $SID.name = $Instance.name.replace("OracleASMService", "").toUpper()
+        $SID.name = $Instance.Name.Replace("OracleASMService", "").ToUpper()
         $SID.sync_asm_sections = $SYNC_ASM_SECTIONS
         $SID.async_asm_sections = $ASYNC_ASM_SECTIONS
-        $SID.home = (Get-OracleHome -SID $Instance)
-        Write-DebugOutput -Message "Found ASM instance ${SID.name} with OracleHome: ${SID.home}"
+        $SID.home = (Get-OracleHome -SID $SID)
+        Write-DebugOutput -Message "Found ASM instance $($SID.name) with OracleHome: $($SID.home)"
         # Example: ASMUSER = @("myUser", "myPassword", "myOptionalSYSASM", "myOptionalHostname", "myOptionalPort", "myOptionalAlias")
-        $ASMUSER = (Check-Variable -MyVariable "ASMUSER_${SID.name}")
-        if ($null -eq $ASMUSER.value) {
-            Write-DebugOutput "No explicit ASM connect for ${SID.name}"
-            $ASMUSER = (Check-Variable -MyVariable "${ASMUSER}")
-        }
+        $SIDUSER = (Check-Variable -MyVariable "ASMUSER_$($SID.name)")
         if ($null -ne $ASMUSER.value) {
+            Write-DebugOutput "Found explicit ASM connect for $($SID.name)"
+            $ASMUSER = $SIDUSER
+            Write-DebugOutput -Message "Using $($DBUSER[0]) with ******** as credentials"
+        }
+        if ($null -ne $ASMUSER) {
             $SID.user = $ASMUSER[0]
             $SID.password = $ASMUSER[1]
             if ($null -ne $ASMUSER[2] -And $ASMUSER -ne "") {
-                $SID.privileges = "as ${ASMUSER[2]}"
+                $SID.privileges = " as $($ASMUSER[2])"
             }
             if ($null -ne $ASMUSER[3] -And $ASMUSER[3] -ne "") {
                 $SID.hostname = $ASMUSER[3]
@@ -1627,30 +1664,32 @@ ForEach($Instance in $RunningInstances) {
             if ($null -ne $ASMUSER[5] -And $ASMUSER[5] -ne "") {
                 $SID.alias = $ASMUSER[5]
             }
-            $SID.tnsalias = "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=${SID.hostname})(PORT=${SID.port}))(CONNECT_DATA=(SERVICE_NAME=+ASM)(INSTANCE_NAME=${SID.name})(UR=A)))"
-            $SID.connect = "${SID.user}/${SID.password}@${SID.tnsalias}${SID.privileges}"
-            $SID.version = (Get-DBVersion -SID $Instance)
-            Write-DebugOutput "Set ${SID.connect} as default connect for ${SID.name}. DBVersion is ${SID.version}"
+            $SID.tnsalias = "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=$($SID.hostname))(PORT=$($SID.port)))(CONNECT_DATA=(SERVICE_NAME=+ASM)(INSTANCE_NAME=$($SID.name))(UR=A)))"
+            $SID.connect = "$($SID.user)/$($SID.password)@$($SID.tnsalias)$($SID.privileges)"
+            $SID.version = (Get-DBVersion -SID $SID)
+            Write-DebugOutput "Set '$($SID.user)/********@$($SID.tnsalias)$($SID.privileges)' as default connect for $($SID.name). ASM version is $($SID.version)"
         } else {
-            Write-DebugOutput "No default connect for ${SID.name}"
+            Write-DebugOutput "No default connect for $($SID.name)"
         }
     } else {
-        $SID.name = $instance.name.replace("OracleServer", "")
+        $SID.name = $instance.Name.replace("OracleService", "").ToUpper()
         $SID.sync_sections = $SYNC_SECTIONS
         $SID.async_sections = $ASYNC_SECTIONS
-        $SID.home = $Instance.oracleHome=(Get-OracleHome $Instance)
-        Write-DebugOutput -Message "Found ASM instance ${SID.name} with OracleHome: ${SID.home}"
+        $SID.home = (Get-OracleHome -SID $SID)
+        Write-DebugOutput -Message "Found DB instance $($SID.name) with OracleHome: $($SID.home)"
         # Example: DBUSER = @("myUser", "myPassword", "myOptionalSYSDBA", "myOptionalHostname", "myOptionalPort", "myOptionalAlias")
-        $DBUSER = (Check-Variable -MyVariable "DBUSER_${SID.name}")
-        if ($null -eq $DBUSER.value) {
-            Write-DebugOutput "No explicit DB connect for ${SID.name}"
-            $DBUSER = (Check-Variable -MyVariable "${DBUSER}")
+        Write-DebugOutput -Message "DBUSER: $($DBUSER[0]), ********, $($DBUSER[2])"
+        $SIDUSER = (Check-Variable -MyVariable "DBUSER_$($SID.name)")
+        if ($null -ne $SIDUSER.value) {
+            Write-DebugOutput "Found explicit DB connect for $($SID.name)"
+            $DBUSER = $SIDUSER
+            Write-DebugOutput -Message "Using $($DBUSER[0]) with ******** as credentials"
         }
-        if ($null -ne $DBUSER.value) {
+        if ($null -ne $DBUSER) {
             $SID.user = $DBUSER[0]
             $SID.password = $DBUSER[1]
             if ($null -ne $DBUSER[2] -And $DBUSER -ne "") {
-                $SID.privileges = "as ${DBUSER[2]}"
+                $SID.privileges = " as $($DBUSER[2])"
             }
             if ($null -ne $DBUSER[3] -And $DBUSER[3] -ne "") {
                 $SID.hostname = $ASMUSER[3]
@@ -1661,29 +1700,29 @@ ForEach($Instance in $RunningInstances) {
             if ($null -ne $DBUSER[5] -And $DBUSER[5] -ne "") {
                 $SID.alias = $DBUSER[5]
             }
-            $SID.tnsalias = "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=${SID.hostname})(PORT=${SID.port}))(CONNECT_DATA=(SID=${SID.name})))"
-            $SID.connect = "${SID.user}/${SID.password}@${SID.tnsalias}${SID.privileges}"
-            $SID.version = (Get-DBVersion -SID $Instance)
-            Write-DebugOutput "Set ${SID.connect} as default connect for ${SID.name}. DBVersion is ${SID.version}"
+            $SID.tnsalias = "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=$($SID.hostname))(PORT=$($SID.port)))(CONNECT_DATA=(SID=$($SID.name))))"
+            $SID.connect = "$($SID.user)/$($SID.password)@$($SID.tnsalias)$($SID.privileges)"
+            $SID.version = (Get-DBVersion -SID $SID)
+            Write-DebugOutput "Set '$($SID.user)/********@$($SID.tnsalias)$($SID.privileges)' as default connect for $($SID.name). DB Version is $($SID.version)"
         } else {
-            Write-DebugOutput "No default connect for ${SID.name}"
+            Write-DebugOutput "No default connect for $($SID.name)"
         }
     }
 
     # Check if we should not monitor this SID
-    $ExcludeSections = (Check-Variable -MyVariable "$EXCLUDE_$Instance.name")
+    $ExcludeSections = (Check-Variable -MyVariable "EXCLUDE_$($SID.name)")
     if ($null -eq $ExcludeSections) {
         $ExcludeSections = @()
     }
     if ($ONLY_SIDS.count -ne 0 -Or $ExcludeSections.count -ne 0) {
         If ($ExcludeSections -Contains "ALL") {
-            Write-DebugOutput -Message "All sections of ${SID.name} are excluded. Skipping this SID."
+            Write-DebugOutput -Message "All sections of $($SID.name) are excluded. Skipping this SID."
             $SID.monitor = $false
-        } elseif ($ONLY_SIDS -Contains $Instance.name) {
-            Write-DebugOutput -Message "${SID.name} is in $ONLY_SIDS."
+        } elseif ($ONLY_SIDS -Contains $SID.name) {
+            Write-DebugOutput -Message "$($SID.name) is in $ONLY_SIDS."
             $SID.monitor = $false
         } elseif ($ExcludeSections.count -ge 1 -AND $SID.asm -eq $false) {
-            Write-DebugOutput -Message "Remove excluded sections from ${SID.name}: $ExcludeSections"
+            Write-DebugOutput -Message "Remove excluded sections from $($SID.name): $ExcludeSections"
             ForEach($Section in $ExcludeSections) {
                 if ($SID.sync_sections -contains $Section) {
                     $SID = $SID | Where-Object ($_.sync_sections -ne $Section)
@@ -1692,7 +1731,7 @@ ForEach($Instance in $RunningInstances) {
                 }
             }
         } elseif ($ExcludeSections.count -ge 1 -And $SID.asm -eq $true) {
-            Write-DebugOutput -Message "Remove excluded sections from ${SID.name}: $ExcludeSections"
+            Write-DebugOutput -Message "Remove excluded sections from $($SID.name): $ExcludeSections"
             ForEach($Section in $ExcludeSections) {
                 if ($SID.sync_asm_sections -contains $Section) {
                     $SID = $SID | Where-Object ($_.sync_asm_sections -ne $Section)
@@ -1704,15 +1743,13 @@ ForEach($Instance in $RunningInstances) {
     }
 
     # Add Instance to the list
-    Write-DebugOutput -Message "Add ${SID.name} to list of instances to connect to."
-    $Instances.Add($SID)
+    Write-DebugOutput -Message "Add $($SID.name) to list of instances to connect to."
+    $Instances.Add($SID) | Out-Null
 }
-
-
 
 # Do the sync stuff of all instances (including ASM)
 ForEach($Instance in $Instances) {
-    Write-DebugOutput -m "Prepare sync sections for ${SID.name}."
+    Write-DebugOutput -m "Prepare sync sections for $($Instance.name)."
     $SyncQuery = ""
     if ($Instance.asm) {
         $Sections = $Instance.sync_asm_sections
@@ -1723,14 +1760,15 @@ ForEach($Instance in $Instances) {
         Continue
     }
     ForEach($Section in $Sections) {
-        $SyncQuery = $SyncQuery + (Invoke-Expression "sql_${Section}" -DBVersion $Instance.version)
+        $SectionQuery = Invoke-Expression "sql_$Section -DBVERSION $($Instance.version)"
+        $SyncQuery = $SyncQuery + $SectionQuery
     }
     Run-SqlStatement -Banner "Sync_SQLs" -Statement "$SyncQuery" -Async $false -SID $Instance
 }
 
 # Do the same as above for async sections
 ForEach($Instance in $Instances) {
-    Write-DebugOutput -m "Prepare async sections for ${SID.name}."
+    Write-DebugOutput -m "Prepare async sections for $($SID.name)."
     $AsyncQuery = ""
     if ($Instance.asm) {
         $Sections = $Instance.async_asm_sections
@@ -1741,7 +1779,8 @@ ForEach($Instance in $Instances) {
         Continue
     }
     ForEach($Section in $Sections) {
-        $AsyncQuery = $AsyncQuery + (Invoke-Expression "sql_${Section}" -DBVersion $Instance.version)
+        $SectionQuery = Invoke-Expression "sql_$Section -DBVERSION $($Instance.version)"
+        $AsyncQuery = $AsyncQuery + $SectionQuery
     }
-    Run-SqlStatement -Banner "Async_SQLs" - Statement "$SyncQuery" -Async $true -SID $Instance
+    Run-SqlStatement -Banner "Async_SQLs" -Statement "$AsyncQuery" -Async $true -SID $Instance
 }
