@@ -1820,6 +1820,7 @@ ForEach($Instance in $RunningInstances) {
 # Do the sync stuff on all instances (including ASM)
 ForEach ($Instance in $Instances) {
     $Sections = Prepare-RunType -SID $Instance -Type "Sync_SQLs"
+    Write-DebugOutput -Message "Running sync sections on $($Instance.name): $Sections"
     $SyncQuery = Build-Query -Sections $Sections -Version $Instance.version
     Run-SqlStatement -Banner "Sync_SQLs" -Statement "$SyncQuery" -Async $false -SID $Instance
 }
@@ -1827,6 +1828,8 @@ ForEach ($Instance in $Instances) {
 # Do the same as above for async sections
 ForEach ($Instance in $Instances) {
     $Sections = Prepare-Runtype -SID $Instance -Type "Async_SQLs"
+    Write-DebugOutput -Message "Running async sections on $($Instance.name): $Sections"
     $AsyncQuery = Build-Query -Sections $Sections -Version $Instance.version
     Run-SqlStatement -Banner "Async_SQLs" -Statement "$AsyncQuery" -Async $true -SID $Instance
 }
+
