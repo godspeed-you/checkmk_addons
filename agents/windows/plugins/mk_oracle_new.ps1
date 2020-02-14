@@ -1,4 +1,6 @@
-# First we declare all the sql statements, that we  possibly will use
+####################################################################################
+################ Declare the function for the queries ##############################
+####################################################################################
 
 ################################################################################
 # SQL for Performance information
@@ -1399,8 +1401,9 @@ Function sql_asm_diskgroup {
 }
 
 ####################################################################################
-################ This is the entry of this Script ##################################
+################ Declare some "real" functions #####################################
 ####################################################################################
+
 Function Write-DebugOutput {
     Param(
         [string]$Message
@@ -1413,14 +1416,6 @@ Function Write-DebugOutput {
     if ($DEBUG -gt 0) {"${MyTime}: ${Message}" | Add-Content $LogFile}
 }
 
-# Set basic variables which can be modified by sub functions
-Set-Variable -Name SYNC_SECTIONS -Scope Script -Value @("instance", "sessions", "logswitches", "undostat", "recovery_area", "processes", "recovery_status", "longactivesessions", "dataguard_stats", "performance")
-Set-Variable -Name SYNC_ASM_SECTIONS -Scope Script -Value @("instance")
-Set-Variable -Name ASYNC_SECTIONS -Scope Script -Value @("tablespaces", "rman", "jobs", "ts_quotas", "resumable", "locks")
-Set-Variable -Name ASYNC_ASM_SECTIONS -Scope Script -Value @("asm_diskgroup")
-Set-Variable -Name DEBUG -Scope Script -Value 0
-Set-Variable -Name CACHE_MAXAGE -Scope Script -Value 600
-Set-Variable -Name ONLY_SIDS -Scope Script -Value @()
 
 Function Write-DummySections {
     Write-DebugOutput -Message "Write dummy sections"
@@ -1441,8 +1436,8 @@ Function Get-OracleHome {
     Param(
         [PSObject]$SID
     )
-    $Key="HKLM:\SYSTEM\CurrentControlSet\services\OracleService" + $SID.name
-    $Path=(Get-ItemProperty -Path $key).ImagePath
+    $Key="HKLM:\SYSTEM\CurrentControlSet\services\OracleService$($SID.name)"
+    $Path=(Get-ItemProperty -Path $Key).ImagePath
     Return $Path.SubString(0, $Path.LastIndexOf("\")-4)
 }
 
@@ -1459,11 +1454,7 @@ Function Check-Variable {
         [string]$MyVariable
     )
     $CheckedVariable = (Get-Variable -Name $MyVariable -ErrorAction SilentlyContinue)
-    if ($null -ne $MyVariable) {
-        Return $CheckedVariable
-    } else {
-        Return $null
-    }
+    Return $CheckedVariable
 }
 
 Function New-InstanceObject {
@@ -1478,10 +1469,10 @@ Function New-InstanceObject {
         "tnsalias" = $null
         "connect" = $null
         "piggybackhost" = ""
-        "sync_sections" = @()
-        "sync_asm_sections" = @()
-        "async_sections" = @()
-        "async_asm_sections" = @()
+        "sync_sections" = (New-Object system.collections.arraylist)
+        "sync_asm_sections" = (New-Object system.collections.arraylist)
+        "async_sections" = (New-Object system.collections.arraylist)
+        "async_asm_sections" = (New-Object system.collections.arraylist)
         "monitor" = $true
         "asm" = $false
         "home" = ""
@@ -1496,27 +1487,27 @@ Function Get-SqlPrefix {
     )
     if ($Type -eq "Query") {
         Return @'
-        set pages 0 trimspool on;
-        set linesize 1024;
-        set feedback off;
-        whenever OSERROR EXIT failure;
-        whenever SQLERROR EXIT failure;
+            set pages 0 trimspool on;
+            set linesize 1024;
+            set feedback off;
+            whenever OSERROR EXIT failure;
+            whenever SQLERROR EXIT failure;
 
 '@
     } elseif ($Type -eq "Version") {
         Return @'
-        whenever sqlerror exit failure rollback;
-        whenever oserror exit failure rollback;
-        SET TRIMOUT ON
-        SET TRIMSPOOL ON
-        set linesize 1024
-        set heading off
-        set echo off
-        set termout off
-        set pagesize 0
-        set feedback off
-        select replace(version,'.','') from v$instance;
-        exit;
+            whenever sqlerror exit failure rollback;
+            whenever oserror exit failure rollback;
+            SET TRIMOUT ON
+            SET TRIMSPOOL ON
+            set linesize 1024
+            set heading off
+            set echo off
+            set termout off
+            set pagesize 0
+            set feedback off
+            select replace(version,'.','') from v$instance;
+            exit;
 
 '@
     }
@@ -1538,7 +1529,7 @@ Function Run-SqlStatement {
 
     $SQLQuery = (Get-SqlPrefix -Type "Query") + $Statement
 
-    $OutputPath = $MK_TEMPDIR + "\" + "$Banner.$($SID.name).txt"
+    $OutputPath = "$MK_TEMPDIR\$Banner.$($SID.name).txt"
 
     if ($Async -And (Test-Path -Path "$OutputPath")) {
         Write-DebugOutput -Message "Found cache of async sections"
@@ -1547,10 +1538,13 @@ Function Run-SqlStatement {
         if (((Get-Date) - $FileAge) -lt $MaxAge) {
             Write-DebugOutput -Message "Async sections still valid. Using cached data of $OutputPath"
             $QueryResult = Get-Content $OutputPath
+            $RunAsync = $false
+        } else {
+            Write-DebugOutput -Message "Async sections not valid anymore."
+            $RunAsync = $true
         }
-        $RunAsync = $false # Cache is valid. No need for an update
     } elseif ($Async) {
-        Write-DebugOutput -Message "Found no cache of async sections"
+        Write-DebugOutput -Message "Found no cache file of async sections"
         $RunAsync = $true # Cache is not valid anymore or does not even exist
     }
 
@@ -1566,7 +1560,9 @@ Function Run-SqlStatement {
         # Check exit Codes and prepare Output accordingly
         if ($LastExitCode -eq 0) {
             Write-DebugOutput -Message "Completed without errors. Writing Output to $Outputpath"
-            $QueryResult | Set-Content $OutputPath
+            if (!$Asynci -Or $RunAsync) {
+                $QueryResult | Set-Content $OutputPath
+            }
             Write-Output $QueryResult
         } else {
             Write-DebugOutput -Message "Completed with errors. Preparing Output and write it to $Outputpath"
@@ -1590,52 +1586,56 @@ Function Run-SqlStatement {
     }
 }
 
-# Read Config
-#Write-DebugOutput -Message "Fetch MK_CONFDIR"
-if (!$env:MK_CONFDIR) {
-    Set-Variable -Name MK_CONFDIR -Value "C:\Program Files (x86)\check_mk\config"
-}
-if (!$env:MK_TEMPDIR) {
-    Set-Variable -Name MK_TEMPDIR -Scope Script -Value "C:\Program Files (x86)\check_mk\temp"
-}
-
-# Assign Custom Variables
-Set-Variable -Name ConfigFile -Value "${MK_CONFDIR}\mk_oracle_cfg.ps1"
-if (Test-Path -Path "$ConfigFile") {
-    Write-DebugOutput "${ConfigFile} found, reading"
-    . ${ConfigFile}
-} else {
-    Write-DebugOutput "${ConfigFile} not found"
-}
-
-# Get a list of all running Oracle Instances
-$RunningInstances=(Get-Service -Name "Oracle*Service*" -include "OracleService*", "OracleASMService*" | Where-Object {$_.status -eq "Running"})
-Write-DebugOutput -Message "Found instances: $($RunningInstances.DisplayName)"
-
-# the following line ensures that the output of the files generated by calling
-# Oracle SQLplus through Powershell are not limited to 80 character width. The
-# 80 character width limit is the default
-$Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (512, 150)
-
-Write-DummySections
-
-if (($RunningInstances | Measure-Object).count -eq 0) {
-    Write-DebugOutput "Found no running Oracle DB instances. Ending script."
-    Exit
+Function Prepare-RunType {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [PSObject]$SID,
+        [Parameter(Mandatory=$true)]
+        [string]$Type
+    )
+    Write-DebugOutput -Message "Prepare $Type for $($SID.name)"
+    if ($SID.asm) {
+        if ($Type -eq "Sync_SQLs") {
+            $Sections = $SID.sync_asm_sections
+        } elseif ($Type -eq "Async_SQLs") {
+            $Sections = $SID.async_asm_sections
+        }
+    } else {
+        if ($Type -eq "Sync_SQLs") {
+            $Sections = $SID.sync_sections
+        } elseif ($Type -eq "Async_SQLs") {
+            $Sections = $SID.async_sections
+        }
+    }
+    Return $Sections
 }
 
-####################################################################################
-################ This is the main part of this Script ##############################
-####################################################################################
+Function Build-Query {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [array]$Sections,
+        [Parameter(Mandatory=$true)]
+        [int]$Version
+    )
+    $Query = ""
+    ForEach ($Section in $Sections) {
+        $SectionQuery = Invoke-Expression "sql_$Section -DBVERSION $Version"
+        $Query = $Query + $SectionQuery
+    }
+    Return $Query
+}
 
-# Prepare Connects to instances
-Set-Variable -Name Instances -Value (New-Object system.collections.arraylist)
-
-ForEach($Instance in $RunningInstances) {
-    $SID = New-InstanceObject
-    Write-DebugOutput -Message "Instance: $($Instance.Name)"
-    # Set Instance nam, default sections and home
-    if ($Instance.Name -like "OracleASMService*") {
+Function Get-InstanceValues {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [PSObject]$Instance,
+        [Parameter(Mandatory=$true)]
+        [PSObject]$SID,
+        [Parameter(Mandatory=$true)]
+        [bool]$IsASM
+    )
+    # Basic Values of instance
+    if ($IsASM) {
         $SID.asm = $true
         $SID.name = $Instance.Name.Replace("OracleASMService", "").ToUpper()
         $SID.sync_asm_sections = $SYNC_ASM_SECTIONS
@@ -1644,32 +1644,12 @@ ForEach($Instance in $RunningInstances) {
         Write-DebugOutput -Message "Found ASM instance $($SID.name) with OracleHome: $($SID.home)"
         # Example: ASMUSER = @("myUser", "myPassword", "myOptionalSYSASM", "myOptionalHostname", "myOptionalPort", "myOptionalAlias")
         $SIDUSER = (Check-Variable -MyVariable "ASMUSER_$($SID.name)")
-        if ($null -ne $ASMUSER.value) {
+        if ($null -ne $SIDUSER.value) {
             Write-DebugOutput "Found explicit ASM connect for $($SID.name)"
-            $ASMUSER = $SIDUSER
-            Write-DebugOutput -Message "Using $($DBUSER[0]) with ******** as credentials"
-        }
-        if ($null -ne $ASMUSER) {
-            $SID.user = $ASMUSER[0]
-            $SID.password = $ASMUSER[1]
-            if ($null -ne $ASMUSER[2] -And $ASMUSER -ne "") {
-                $SID.privileges = " as $($ASMUSER[2])"
-            }
-            if ($null -ne $ASMUSER[3] -And $ASMUSER[3] -ne "") {
-                $SID.hostname = $ASMUSER[3]
-            }
-            if ($null -ne $ASMUSER[4] -And $ASMUSER[4] -ne "") {
-                $SID.port = $ASMUSER[4]
-            }
-            if ($null -ne $ASMUSER[5] -And $ASMUSER[5] -ne "") {
-                $SID.alias = $ASMUSER[5]
-            }
-            $SID.tnsalias = "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=$($SID.hostname))(PORT=$($SID.port)))(CONNECT_DATA=(SERVICE_NAME=+ASM)(INSTANCE_NAME=$($SID.name))(UR=A)))"
-            $SID.connect = "$($SID.user)/$($SID.password)@$($SID.tnsalias)$($SID.privileges)"
-            $SID.version = (Get-DBVersion -SID $SID)
-            Write-DebugOutput "Set '$($SID.user)/********@$($SID.tnsalias)$($SID.privileges)' as default connect for $($SID.name). ASM version is $($SID.version)"
+            $USER = $SIDUSER
+            Write-DebugOutput -Message "Using $($USER[0]) with ******** as credentials"
         } else {
-            Write-DebugOutput "No default connect for $($SID.name)"
+            $USER = $ASMUSER
         }
     } else {
         $SID.name = $instance.Name.replace("OracleService", "").ToUpper()
@@ -1682,33 +1662,53 @@ ForEach($Instance in $RunningInstances) {
         $SIDUSER = (Check-Variable -MyVariable "DBUSER_$($SID.name)")
         if ($null -ne $SIDUSER.value) {
             Write-DebugOutput "Found explicit DB connect for $($SID.name)"
-            $DBUSER = $SIDUSER
+            $USER = $SIDUSER
             Write-DebugOutput -Message "Using $($DBUSER[0]) with ******** as credentials"
-        }
-        if ($null -ne $DBUSER) {
-            $SID.user = $DBUSER[0]
-            $SID.password = $DBUSER[1]
-            if ($null -ne $DBUSER[2] -And $DBUSER -ne "") {
-                $SID.privileges = " as $($DBUSER[2])"
-            }
-            if ($null -ne $DBUSER[3] -And $DBUSER[3] -ne "") {
-                $SID.hostname = $ASMUSER[3]
-            }
-            if ($null -ne $DBUSER[4] -And $DBUSER[4] -ne "") {
-                $SID.port = $ASMUSER[4]
-            }
-            if ($null -ne $DBUSER[5] -And $DBUSER[5] -ne "") {
-                $SID.alias = $DBUSER[5]
-            }
-            $SID.tnsalias = "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=$($SID.hostname))(PORT=$($SID.port)))(CONNECT_DATA=(SID=$($SID.name))))"
-            $SID.connect = "$($SID.user)/$($SID.password)@$($SID.tnsalias)$($SID.privileges)"
-            $SID.version = (Get-DBVersion -SID $SID)
-            Write-DebugOutput "Set '$($SID.user)/********@$($SID.tnsalias)$($SID.privileges)' as default connect for $($SID.name). DB Version is $($SID.version)"
         } else {
-            Write-DebugOutput "No default connect for $($SID.name)"
+            $USER = $DBUSER
         }
-    }
 
+    }
+    # Credentials for instances
+    if ($USER) {
+        $SID.user = $USER[0]
+        $SID.password = $USER[1]
+        if ($null -ne $USER[2] -And $USER -ne "") {
+            $SID.privileges = " as $($USER[2])"
+        }
+        if ($null -ne $USER[3] -And $USER[3] -ne "") {
+            $SID.hostname = $USER[3]
+        }
+        if ($null -ne $USER[4] -And $USER[4] -ne "") {
+            $SID.port = $USER[4]
+        }
+        if ($null -ne $USER[5] -And $USER[5] -ne "") {
+            $SID.alias = $USER[5]
+        }
+    } else {
+        Write-DebugOutput "No login data provided for $($SID.name). Will not monitor this instance"
+        $SID.monitor = $false
+    }
+    # Build connection strings for instance
+    if ($IsASM) {
+        $SID.tnsalias = "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=$($SID.hostname))(PORT=$($SID.port)))(CONNECT_DATA=(SERVICE_NAME=+ASM)(INSTANCE_NAME=$($SID.name))(UR=A)))"
+        $SID.connect = "$($SID.user)/$($SID.password)@$($SID.tnsalias)$($SID.privileges)"
+        $SID.version = (Get-DBVersion -SID $SID)
+        Write-DebugOutput "Set '$($SID.user)/********@$($SID.tnsalias)$($SID.privileges)' as default connect for $($SID.name). ASM version is $($SID.version)"
+    } else {
+         $SID.tnsalias = "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=$($SID.hostname))(PORT=$($SID.port)))(CONNECT_DATA=(SID=$($SID.name))))"
+         $SID.connect = "$($SID.user)/$($SID.password)@$($SID.tnsalias)$($SID.privileges)"
+         $SID.version = (Get-DBVersion -SID $SID)
+         Write-DebugOutput "Set '$($SID.user)/********@$($SID.tnsalias)$($SID.privileges)' as default connect for $($SID.name). DB Version is $($SID.version)"
+    }
+    Return $SID
+}
+
+Function Get-InstanceSections {
+    Param(
+        [Parameter(Mandatory=$true)]
+        [PSObject]$SID
+    )
     # Check if we should not monitor this SID
     $ExcludeSections = (Check-Variable -MyVariable "EXCLUDE_$($SID.name)")
     if ($null -eq $ExcludeSections) {
@@ -1724,63 +1724,109 @@ ForEach($Instance in $RunningInstances) {
         } elseif ($ExcludeSections.count -ge 1 -AND $SID.asm -eq $false) {
             Write-DebugOutput -Message "Remove excluded sections from $($SID.name): $ExcludeSections"
             ForEach($Section in $ExcludeSections) {
-                if ($SID.sync_sections -contains $Section) {
+                if (!$SID.asm -And $SID.sync_sections -contains $Section) {
                     $SID = $SID | Where-Object ($_.sync_sections -ne $Section)
-                } elseif ($SID.async_sections -contains $Section) {
+                } elseif ($SID.asm -And $SID.async_sections -contains $Section) {
                     $SID = $SID | Where-Object ($_.async_sections -ne $Section)
                 }
             }
         } elseif ($ExcludeSections.count -ge 1 -And $SID.asm -eq $true) {
             Write-DebugOutput -Message "Remove excluded sections from $($SID.name): $ExcludeSections"
             ForEach($Section in $ExcludeSections) {
-                if ($SID.sync_asm_sections -contains $Section) {
+                if (!$SID.asm -And $SID.sync_asm_sections -contains $Section) {
                     $SID = $SID | Where-Object ($_.sync_asm_sections -ne $Section)
-                } elseif ($SID.async_asm_sections -contains $Section) {
+                } elseif ($SID.asm -And $SID.async_asm_sections -contains $Section) {
                     $SID = $SID | Where-Object ($_.sync_sections -ne $Section)
                 }
             }
         }
     }
-
-    # Add Instance to the list
-    Write-DebugOutput -Message "Add $($SID.name) to list of instances to connect to."
-    $Instances.Add($SID) | Out-Null
+    Return $SID
 }
 
-# Do the sync stuff of all instances (including ASM)
-ForEach($Instance in $Instances) {
-    Write-DebugOutput -m "Prepare sync sections for $($Instance.name)."
-    $SyncQuery = ""
-    if ($Instance.asm) {
-        $Sections = $Instance.sync_asm_sections
+####################################################################################
+################ Initialize variables and environment ##############################
+####################################################################################
+
+# The following line ensures that the output of the files generated by calling
+# Oracle SQLplus through Powershell are not limited to 80 character width. The
+# 80 character width limit is the default
+$Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (512, 150)
+
+Set-Variable -Name SYNC_SECTIONS -Scope Script -Value @("instance", "sessions", "logswitches", "undostat", "recovery_area", "processes", "recovery_status", "longactivesessions", "dataguard_stats", "performance")
+Set-Variable -Name SYNC_ASM_SECTIONS -Scope Script -Value @("instance")
+Set-Variable -Name ASYNC_SECTIONS -Scope Script -Value @("tablespaces", "rman", "jobs", "ts_quotas", "resumable", "locks")
+Set-Variable -Name ASYNC_ASM_SECTIONS -Scope Script -Value @("asm_diskgroup")
+Set-Variable -Name DEBUG -Scope Script -Value 0
+Set-Variable -Name CACHE_MAXAGE -Scope Script -Value 600
+Set-Variable -Name ONLY_SIDS -Scope Script -Value (New-Object system.collections.arraylist)
+
+####################################################################################
+################ Write dummy sections and get running instances ####################
+####################################################################################
+
+Write-DummySections
+
+$RunningInstances=(Get-Service -Name "Oracle*Service*" -include "OracleService*", "OracleASMService*" | Where-Object {$_.status -eq "Running"})
+Write-DebugOutput -Message "Found instances: $($RunningInstances.DisplayName)"
+
+if (($RunningInstances | Measure-Object).count -eq 0) {
+    Write-DebugOutput "Found no running Oracle DB instances. Ending script."
+    Exit
+}
+
+####################################################################################
+################ Import user config ################################################
+####################################################################################
+
+if (!$env:MK_CONFDIR) {
+    Set-Variable -Name MK_CONFDIR -Value "C:\Program Files (x86)\check_mk\config"
+}
+if (!$env:MK_TEMPDIR) {
+    Set-Variable -Name MK_TEMPDIR -Scope Script -Value "C:\Program Files (x86)\check_mk\temp"
+}
+
+Set-Variable -Name ConfigFile -Value "${MK_CONFDIR}\mk_oracle_cfg.ps1"
+if (Test-Path -Path "$ConfigFile") {
+    Write-DebugOutput "${ConfigFile} found, reading"
+    . ${ConfigFile}
+} else {
+    Write-DebugOutput "${ConfigFile} not found"
+}
+
+####################################################################################
+################ This is the main part of this Script ##############################
+####################################################################################
+
+# Prepare Connects to instances
+Set-Variable -Name Instances -Value (New-Object system.collections.arraylist)
+
+ForEach($Instance in $RunningInstances) {
+    $SID = New-InstanceObject
+    Write-DebugOutput -Message "Instance: $($Instance.name)"
+    if ($Instance.name -like "OracleASMService*") {
+        $SID = Get-InstanceValues -SID $SID -Instance $Instance -IsASM $true
     } else {
-        $Sections = $Instance.sync_sections
+        $SID = Get-InstanceValues -SID $SID -Instance $Instance -IsASM $false
     }
-    if ($Sections.count -eq 0) {
-        Continue
+    $SID = Get-InstanceSections -SID $SID
+    # Add Instance to the list
+    if ($SID.monitor) {
+        Write-DebugOutput -Message "Add $($SID.name) to list of instances to connect to."
+        $Instances.Add($SID) | Out-Null
     }
-    ForEach($Section in $Sections) {
-        $SectionQuery = Invoke-Expression "sql_$Section -DBVERSION $($Instance.version)"
-        $SyncQuery = $SyncQuery + $SectionQuery
-    }
+}
+
+# Do the sync stuff on all instances (including ASM)
+ForEach ($Instance in $Instances) {
+    $Sections = Prepare-RunType -SID $Instance -Type "Sync_SQLs"
+    $SyncQuery = Build-Query -Sections $Sections -Version $Instance.version
     Run-SqlStatement -Banner "Sync_SQLs" -Statement "$SyncQuery" -Async $false -SID $Instance
 }
 
 # Do the same as above for async sections
-ForEach($Instance in $Instances) {
-    Write-DebugOutput -m "Prepare async sections for $($SID.name)."
-    $AsyncQuery = ""
-    if ($Instance.asm) {
-        $Sections = $Instance.async_asm_sections
-    } else {
-        $Sections = $Instance.async_sections
-    }
-    if ($Sections.count -eq 0) {
-        Continue
-    }
-    ForEach($Section in $Sections) {
-        $SectionQuery = Invoke-Expression "sql_$Section -DBVERSION $($Instance.version)"
-        $AsyncQuery = $AsyncQuery + $SectionQuery
-    }
+ForEach ($Instance in $Instances) {
+    $Sections = Prepare-Runtype -SID $Instance -Type "Async_SQLs"
+    $AsyncQuery = Build-Query -Sections $Sections -Version $Instance.version
     Run-SqlStatement -Banner "Async_SQLs" -Statement "$AsyncQuery" -Async $true -SID $Instance
 }
