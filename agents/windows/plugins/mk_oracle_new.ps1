@@ -1,3 +1,26 @@
+<#
+.SYNOPSIS
+    This script gets a lot of data regarding oracle databases and oracle
+    automatic storage management (ASM). The output of this script is fully
+    compatible to the official oracle plugin for windows as it is provided
+    by the official checkmk software package.
+.DESCRIPTION
+    File Name: mk_oracle_new.ps1 Author: Marcel Arentz / tribe29 GmbH
+.INPUTS
+    None. You cannot pipe objects into this script.
+.OUTPUTS
+    System.String. This script returns a string with soem checkmk specific
+    syntax. Each section is started by <<<$SectionName>>>. Each section
+    uses a unique separator like "|" (pipe) or " " (space).
+.EXAMPLE
+    C:\ProgramData\checkmk\service\plugins\mk_oracle_new.ps1
+    <<<oracle_instance>>>
+    SID1|11.2.0.4.0|OPEN|ALLOWED|STARTED|33019795|2910985342|ARCHIVELOG|PRIMARY|NO|SID
+.LINK
+    https://github.com/godspeed-you/checkmk_addons
+#>
+
+
 ####################################################################################
 ################ Declare the function for the queries ##############################
 ####################################################################################
@@ -1477,6 +1500,8 @@ Function New-InstanceObject {
         "asm" = $false
         "home" = ""
         "version" = ""
+        "mk_tempdir" = ""
+        "cache_age" = 600
     }
 }
 
@@ -1510,79 +1535,6 @@ Function Get-SqlPrefix {
             exit;
 
 '@
-    }
-}
-
-Function Run-SqlStatement {
-    Param(
-        [Parameter(Mandatory=$true)]
-        [string]$Banner,
-        [Parameter(Mandatory=$true)]
-        [string]$Statement,
-        [Parameter(Mandatory=$true)]
-        [bool]$Async,
-        [Parameter(Mandatory=$true)]
-        [PSObject]$SID
-    )
-    Write-DebugOutput -Message "Run sql statements of $Banner"
-    $env:ORACLE_SID = $SID.name
-
-    $SQLQuery = (Get-SqlPrefix -Type "Query") + $Statement
-
-    $OutputPath = "$MK_TEMPDIR\$Banner.$($SID.name).txt"
-
-    if ($Async -And (Test-Path -Path "$OutputPath")) {
-        Write-DebugOutput -Message "Found cache of async sections"
-        $FileAge = (Get-Item $OutputPath).LastWriteTime
-        $MaxAge = New-Timespan -Days 0 -Hours 0 -Minutes ($CACHE_MAXAGE / 60)
-        if (((Get-Date) - $FileAge) -lt $MaxAge) {
-            Write-DebugOutput -Message "Async sections still valid. Using cached data of $OutputPath"
-            $QueryResult = Get-Content $OutputPath
-            $RunAsync = $false
-        } else {
-            Write-DebugOutput -Message "Async sections not valid anymore."
-            $RunAsync = $true
-        }
-    } elseif ($Async) {
-        Write-DebugOutput -Message "Found no cache file of async sections"
-        $RunAsync = $true # Cache is not valid anymore or does not even exist
-    }
-
-    try {
-        $SqlError = $false
-
-        # Run the SQL queries
-        if (($Async -And $RunAsync) -Or !$Async) {
-            Write-DebugOutput -Message "Running $Banner"
-            $QueryResult = ($SQLQuery | sqlplus -L -s "$($SID.connect)")
-        }
-
-        # Check exit Codes and prepare Output accordingly
-        if ($LastExitCode -eq 0) {
-            Write-DebugOutput -Message "Completed without errors. Writing Output to $Outputpath"
-            if (!$Asynci -Or $RunAsync) {
-                $QueryResult | Set-Content $OutputPath
-            }
-            Write-Output $QueryResult
-        } else {
-            Write-DebugOutput -Message "Completed with errors. Preparing Output and write it to $Outputpath"
-            $QueryResult = "$($SID.name)|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
-            $QueryResult | Set-Content $OutputPath
-            Write-Output "<<<oracle_instance:sep(124)>>>"
-            Write-Output $QueryResult
-            $SqlError = $true
-        }
-    } catch {
-        # Take care, that if the SQL queries fail, we still get an accordingly prepared Output
-        if (!$SqlError) {
-            Write-DebugOutput -Message "Did not complete. Preparing output and write it to $Outputpath"
-            Write-DebugOutput -Message "Original error message: $QueryResult"
-            $QueryResult = "$($SID.name)|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
-            $QueryResult | Set-Content $OutputPath
-            Write-Output "<<<oracle_instance:sep(124)>>>"
-            Write-Output $QueryResult
-            $SqlError = $true
-        }
     }
 }
 
@@ -1641,6 +1593,8 @@ Function Get-InstanceValues {
         $SID.sync_asm_sections = $SYNC_ASM_SECTIONS
         $SID.async_asm_sections = $ASYNC_ASM_SECTIONS
         $SID.home = (Get-OracleHome -SID $SID)
+        $SID.mk_tempdir = $MK_TEMPDIR
+        $SID.cache_age = $CACHE_MAXAGE
         Write-DebugOutput -Message "Found ASM instance $($SID.name) with OracleHome: $($SID.home)"
         # Example: ASMUSER = @("myUser", "myPassword", "myOptionalSYSASM", "myOptionalHostname", "myOptionalPort", "myOptionalAlias")
         $SIDUSER = (Check-Variable -MyVariable "ASMUSER_$($SID.name)")
@@ -1656,6 +1610,8 @@ Function Get-InstanceValues {
         $SID.sync_sections = $SYNC_SECTIONS
         $SID.async_sections = $ASYNC_SECTIONS
         $SID.home = (Get-OracleHome -SID $SID)
+        $SID.mk_tempdir = $MK_TEMPDIR
+        $SID.cache_age = $CACHE_MAXAGE
         Write-DebugOutput -Message "Found DB instance $($SID.name) with OracleHome: $($SID.home)"
         # Example: DBUSER = @("myUser", "myPassword", "myOptionalSYSDBA", "myOptionalHostname", "myOptionalPort", "myOptionalAlias")
         Write-DebugOutput -Message "DBUSER: $($DBUSER[0]), ********, $($DBUSER[2])"
@@ -1818,18 +1774,97 @@ ForEach($Instance in $RunningInstances) {
 }
 
 # Do the sync stuff on all instances (including ASM)
+Set-Variable -Name SyncJobs -Value (New-Object system.collections.arraylist)
 ForEach ($Instance in $Instances) {
     $Sections = Prepare-RunType -SID $Instance -Type "Sync_SQLs"
     Write-DebugOutput -Message "Running sync sections on $($Instance.name): $Sections"
     $SyncQuery = Build-Query -Sections $Sections -Version $Instance.version
-    Run-SqlStatement -Banner "Sync_SQLs" -Statement "$SyncQuery" -Async $false -SID $Instance
+    $SyncQuery = (Get-SqlPrefix -Type "Query") + $SyncQuery
+    Start-Job -Name "$($Instance.name)-Sync" -ArgumentList $SyncQuery,$Instance -ScriptBlock {
+        Param(
+        [Parameter(Mandatory=$true)]
+        [string]$Statement,
+        [Parameter(Mandatory=$true)]
+        [PSObject]$SID
+    )
+
+    $env:ORACLE_SID = $SID.name
+
+    try {
+        $QueryResult = $Statement | sqlplus -L -s "$($SID.connect)"
+        if ($LastExitCode -eq 0) {
+            Write-Output $QueryResult
+        } else {
+            $QueryResult = "$($SID.name)|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
+            Write-Output "<<<oracle_instance:sep(124)>>>"
+            Write-Output $QueryResult
+        }
+    } catch {
+        $QueryResult = "$($SID.name)|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
+        Write-Output "<<<oracle_instance:sep(124)>>>"
+        Write-Output $QueryResult
+    }
+    } | Out-Null
+    $SyncJobs.Add("$($Instance.name)-Sync") | Out-Null
+}
+Wait-Job -Name $SyncJobs | Out-Null
+ForEach ($Job in $SyncJobs) {
+    $Result = Receive-Job -Name "$Job"
+    Write-Output $Result
+    Remove-Job -Name "$Job"
 }
 
 # Do the same as above for async sections
 ForEach ($Instance in $Instances) {
+    if (Get-Job -Name "$($SID.name)-Async") {
+        $LastRun = Get-Job -Name "$($SID.name)-Async"
+    } else {
+        $LastRun = $false
+    }
+    if ($LastRun -And $LastRun.state -ne "Running") {
+        Remove-Job -Name "$($SID.name)-Async"
+    }
     $Sections = Prepare-Runtype -SID $Instance -Type "Async_SQLs"
     Write-DebugOutput -Message "Running async sections on $($Instance.name): $Sections"
     $AsyncQuery = Build-Query -Sections $Sections -Version $Instance.version
-    Run-SqlStatement -Banner "Async_SQLs" -Statement "$AsyncQuery" -Async $true -SID $Instance
-}
+    $ASyncQuery = (Get-SqlPrefix -Type "Query") + $ASyncQuery
+    $OutputPath = "$MK_Tempdir\Async_SQLs.$($Instance.name).txt"
+    $RunAsyncJob = $true
+    if (Test-Path -Path $OutputPath) {
+        $FileAge = (Get-Item $OutputPath).LastWriteTime
+        $MaxAge = New-Timespan -Days 0 -Hours 0 -Minutes ($($Instance.cache_age) / 60)
+        if (((Get-Date) - $FileAge) -lt $MaxAge) {
+            Get-Content -Path $OutputPath
+            $RunAsyncJob = $false
+        }
+    }
+    if ($RunAsyncJob) {
+        Start-Job -Name "$($Instance.name)-Async" -ArgumentList $AsyncQuery,$OutputPath,$Instance -ScriptBlock {
+            Param(
+                [Parameter(Mandatory=$true)]
+                [string]$Statement,
+                [Parameter(Mandatory=$true)]
+                [string]$OutputPath,
+                [Parameter(Mandatory=$true)]
+                [PSObject]$SID
+            )
 
+            $env:ORACLE_SID = $SID.name
+
+            try {
+                $QueryResult = $Statement | sqlplus -L -s "$($SID.connect)"
+                if ($LastExitCode -eq 0) {
+                    $QueryResult | Set-Content $OutputPath
+                } else {
+                    $QueryResult = "$($SID.name)|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
+                    Set-Content "<<<oracle_instance:sep(124)>>>"
+                    Add-Content $QueryResult
+                }
+            } catch {
+                $QueryResult = "$($SID.name)|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
+                Set-Content "<<<oracle_instance:sep(124)>>>"
+                Add-Content $QueryResult
+            }
+        }
+    }
+}
