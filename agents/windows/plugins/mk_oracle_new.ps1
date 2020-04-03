@@ -1433,10 +1433,12 @@ Function Write-DebugOutput {
     )
     $LogFile = "$MK_TEMPDIR\mk_oracle.log"
     $MyTime=Get-Date -Format o
-    if (!(Test-Path -Path $LogFile)) {
-        "${MyTime}: Starting new run of mk_oracle.ps1" | Set-Content $LogFile
+    if ($DEBUG -gt 0) {
+        if (!(Test-Path -Path $LogFile)) {
+            "${MyTime}: Starting new run of mk_oracle.ps1" | Set-Content $LogFile
+        }
+        "${MyTime}: ${Message}" | Add-Content $LogFile
     }
-    if ($DEBUG -gt 0) {"${MyTime}: ${Message}" | Add-Content $LogFile}
 }
 
 
@@ -1627,8 +1629,10 @@ Function Get-InstanceValues {
     }
     # Credentials for instances
     if ($USER) {
-        $SID.user = $USER[0]
-        $SID.password = $USER[1]
+        if ($USER[0] -ne "/") {
+            $SID.user = $USER[0]
+            $SID.password = $USER[1]
+        }
         if ($null -ne $USER[2] -And $USER -ne "") {
             $SID.privileges = " as $($USER[2])"
         }
@@ -1788,22 +1792,22 @@ ForEach ($Instance in $Instances) {
         [PSObject]$SID
     )
 
-    $env:ORACLE_SID = $SID.name
+        $env:ORACLE_SID = $SID.name
 
-    try {
-        $QueryResult = $Statement | sqlplus -L -s "$($SID.connect)"
-        if ($LastExitCode -eq 0) {
-            Write-Output $QueryResult
-        } else {
+        try {
+            $QueryResult = $Statement | sqlplus -L -s "$($SID.connect)"
+            if ($LastExitCode -eq 0) {
+                Write-Output $QueryResult
+            } else {
+                $QueryResult = "$($SID.name)|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
+                Write-Output "<<<oracle_instance:sep(124)>>>"
+                Write-Output $QueryResult
+            }
+        } catch {
             $QueryResult = "$($SID.name)|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
             Write-Output "<<<oracle_instance:sep(124)>>>"
             Write-Output $QueryResult
         }
-    } catch {
-        $QueryResult = "$($SID.name)|FAILURE|" + ($QueryResult | Select-String -Pattern "ERROR")
-        Write-Output "<<<oracle_instance:sep(124)>>>"
-        Write-Output $QueryResult
-    }
     } | Out-Null
     $SyncJobs.Add("$($Instance.name)-Sync") | Out-Null
 }
@@ -1816,13 +1820,13 @@ ForEach ($Job in $SyncJobs) {
 
 # Do the same as above for async sections
 ForEach ($Instance in $Instances) {
-    if (Get-Job -Name "$($SID.name)-Async") {
-        $LastRun = Get-Job -Name "$($SID.name)-Async"
+    if (Get-Job -Name "$($Instance.name)-Async" -ErrorAction SilentlyContinue) {
+        $LastRun = Get-Job -Name "$($Instance.name)-Async"
     } else {
         $LastRun = $false
     }
     if ($LastRun -And $LastRun.state -ne "Running") {
-        Remove-Job -Name "$($SID.name)-Async"
+        Remove-Job -Name "$($Instance.name)-Async"
     }
     $Sections = Prepare-Runtype -SID $Instance -Type "Async_SQLs"
     Write-DebugOutput -Message "Running async sections on $($Instance.name): $Sections"
@@ -1865,6 +1869,6 @@ ForEach ($Instance in $Instances) {
                 Set-Content "<<<oracle_instance:sep(124)>>>"
                 Add-Content $QueryResult
             }
-        }
+        } | Out-Null
     }
 }
