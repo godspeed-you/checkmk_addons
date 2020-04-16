@@ -1504,6 +1504,7 @@ Function New-InstanceObject {
         "version" = ""
         "mk_tempdir" = ""
         "cache_age" = 600
+        "wallet" = $false
     }
 }
 
@@ -1629,7 +1630,9 @@ Function Get-InstanceValues {
     }
     # Credentials for instances
     if ($USER) {
-        if ($USER[0] -ne "/") {
+        if ($USER[0] -eq "/") {
+            $SID.wallet = $true
+        } else {
             $SID.user = $USER[0]
             $SID.password = $USER[1]
         }
@@ -1655,11 +1658,15 @@ Function Get-InstanceValues {
         $SID.connect = "$($SID.user)/$($SID.password)@$($SID.tnsalias)$($SID.privileges)"
         $SID.version = (Get-DBVersion -SID $SID)
         Write-DebugOutput "Set '$($SID.user)/********@$($SID.tnsalias)$($SID.privileges)' as default connect for $($SID.name). ASM version is $($SID.version)"
+    } elseif ($SID.wallet) {
+        $SID.connect = "/@$($SID.name)$($SID.privileges)"
+        $SID.version = (Get-DBVersion -SID $SID)
+        Write-DebugOutput "Set '/@$($SID.name)$($SID.privileges)' as default connect for $($SID.name). DB Version is $($SID.version)"
     } else {
-         $SID.tnsalias = "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=$($SID.hostname))(PORT=$($SID.port)))(CONNECT_DATA=(SID=$($SID.name))))"
-         $SID.connect = "$($SID.user)/$($SID.password)@$($SID.tnsalias)$($SID.privileges)"
-         $SID.version = (Get-DBVersion -SID $SID)
-         Write-DebugOutput "Set '$($SID.user)/********@$($SID.tnsalias)$($SID.privileges)' as default connect for $($SID.name). DB Version is $($SID.version)"
+        $SID.tnsalias = "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=$($SID.hostname))(PORT=$($SID.port)))(CONNECT_DATA=(SID=$($SID.name))))"
+        $SID.connect = "$($SID.user)/$($SID.password)@$($SID.tnsalias)$($SID.privileges)"
+        $SID.version = (Get-DBVersion -SID $SID)
+        Write-DebugOutput "Set '$($SID.user)/********@$($SID.tnsalias)$($SID.privileges)' as default connect for $($SID.name). DB Version is $($SID.version)"
     }
     Return $SID
 }
