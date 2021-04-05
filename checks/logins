@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Copyright (C) 2019 tribe29 GmbH - License: GNU General Public License v2
+# This file is part of Checkmk (https://checkmk.com). It is subject to the terms and
+# conditions defined in the file COPYING, which is part of this source code package.
+
+# Example output from agent:
+# <<<logins>>>
+# 3
+
+from datetime import datetime
+
+logins_default_levels = (20, 30)
+
+banned_user = {
+    'william': False,
+    'vhserver': False,
+}
+
+banned_address = {
+    '37.24.159.167': False,
+    'tmux(6553).%0': False
+}
+def parse_logins(info):
+    parsed = dict()
+
+    if not info:
+        parsed['logins'] = 0
+        return parsed
+    elif len(info[0]) == 1:
+        parsed['logins'] = int(info[0][0])
+        return parsed
+    
+    for line in info:
+        user, shell, date, time, origin = line
+        year, month, day = date.split('-')
+        hour, minute = time.split(':')
+        unixtime = datetime(int(year),
+                            int(month.lstrip('0')),
+                            int(day.lstrip('0')),
+                            hour=int(hour.lstrip('0')),
+                            minute=int(minute.lstrip('0'))
+                   ).strftime('%s')
+
+        parsed[shell] = [user, unixtime, origin[1:-1]]
+    parsed['logins'] = len(parsed.keys())
+
+    return parsed
+
+
+def inventory_logins(parsed):
+    if 'logins' in parsed.keys():
+        return [(None, "logins_default_levels")]
+
+
+def check_permission_logins(value, param_list, prefix, detected):
+    mode = param_list[0]
+    match = re.match('(' + ')|('.join(param_list[1]) + ')', value)
+
+    if mode.startswith('permitted') and not match or mode.startswith('banned') and match:
+        detected.append(value)
+        return 2, '%s "%s" is forbidden' % (prefix, value)
+    return 0, ''
+
+
+def check_logins(_no_item, params, parsed):
+    if isinstance(params, tuple):
+        params = {'levels': params}
+
+    # This is the legacy info and should be the first output
+    yield check_levels(parsed.get("logins"),
+                       "logins",
+                       params.get('levels', (20, 30)),
+                       infoname="Summary",
+                       human_readable_func=lambda x: '%d' % x)
+
+    detected_users = list()
+    detected_origins = list()
+    for shell, info in parsed.items():
+        if shell == 'logins':
+            continue
+
+        user, date, origin = info
+
+        user_check = (params.get('users'), user, 'User', detected_users)
+        origin_check = (params.get('origins'), origin, 'Origin', detected_origins)
+
+        for p, v, s, d in [user_check, origin_check]:
+            if p and v not in d:
+                yield check_permission_logins(v, p, s, d)
+
+        date_warn, date_crit = params.get('login_date', (None, None))
+        now = time.time()
+        date = int(date)
+        age = get_age_human_readable(now - date)
+        if date_warn and date_crit:
+            if date_crit + date >= now:
+                yield 2, '"%s": "%s" logged in since %s' % (shell, user, age)
+            if date_warn + date >= now:
+                yield 1, '"%s": "%s" logged in since %s' % (shell, user, age)
+
+        yield 0, '%s: "%s" as "%s" since %s' % (shell, origin, user, age) 
+
+
+
+check_info["logins"] = {
+    'parse_function': parse_logins,
+    'check_function': check_logins,
+    'inventory_function': inventory_logins,
+    'service_description': 'Logins',
+    'has_perfdata': True,
+    'group': 'logins',
+}
