@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Telegram
+
+
+# Copyright (C) 2021 Marcel Arentz <marcel.arentz@tribe29.com>
+# License: GNU General Public License v2
+# This file is an extension of Checkmk (https://checkmk.com). It is subject to the terms and
+# conditions defined in the file COPYING, which is part of this source code package.
+
+# TODO: Allow a custom layout of messages
+
+
+from os import environ
+
+from cmk.notification_plugins.utils import retrieve_from_passwordstore as passwords
+from cmk.notification_plugins.utils import (
+    post_request,
+    process_by_result_map,
+    StateInfo
+)
+
+MESSAGES = {
+    (200, 299): StateInfo(0, 'json', 'message_id'),
+    (300, 499): StateInfo(2, 'json', 'description'),
+    (500, 599): StateInfo(1, 'str', 'Server error'),
+}
+
+def telegram_url():
+    password = passwords(environ.get('NOTIFY_PARAMETER_TOKEN'))
+    return f'https://api.telegram.org/bot{password}/sendMessage'
+
+
+def telegram_msg(context):
+    context_new = dict()
+    for key, value in context.items():
+        if key.startswith('CONTACT') or key.startswith('PARAMETER'):
+            context_new[key] = value
+            continue
+        context_new[key] = value.replace('.', '\.').replace('_', '\_').replace('-', '\-')
+
+    chatid = str(context_new.get('PARAMETER_CHATID')).split('\t')[1]
+    message = dict(
+        chat_id=context_new.get(f'{chatid.upper()}'),
+        text="",
+        parse_mode="MarkdownV2"
+    )
+
+    if context.get('WHAT') == 'HOST':
+        message['text'] = """*{NOTIFICATIONTYPE}*: {HOSTNAME}
+*Event*: `{PREVIOUSHOSTHARDSTATE} -> {HOSTSTATE}`
+*Output*: `{HOSTOUTPUT}`
+
+""".format(**context_new)
+    else:
+        message['text'] = """*{NOTIFICATIONTYPE}*: {SERVICEDISPLAYNAME}
+*Host*: `{HOSTNAME}`
+*Event*: `{PREVIOUSSERVICEHARDSTATE} -> {SERVICESTATE}`
+*Output*: `{SERVICEOUTPUT}`
+
+""".format(**context_new)
+
+    return message
+
+if __name__ == '__main__':
+    response = post_request(telegram_msg, url=telegram_url())
+    process_by_result_map(response, result_map=MESSAGES)
