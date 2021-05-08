@@ -30,16 +30,16 @@ def parse_logins(info):
     elif len(info[0]) == 1:
         parsed['logins'] = int(info[0][0])
         return parsed
-    
+
     for line in info:
         user, shell, date, time, origin = line
         year, month, day = date.split('-')
         hour, minute = time.split(':')
         unixtime = datetime(int(year),
-                            int(month.lstrip('0')),
-                            int(day.lstrip('0')),
-                            hour=int(hour.lstrip('0')),
-                            minute=int(minute.lstrip('0'))
+                            int(month),
+                            int(day),
+                            hour=int(hour),
+                            minute=int(minute)
                    ).strftime('%s')
 
         parsed[shell] = [user, unixtime, origin[1:-1]]
