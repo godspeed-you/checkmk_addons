@@ -17,3 +17,9 @@ List of subprojects:
   * There are several telegram extensions out there - And I was not completely happy with any of them. This one is using the latest improvements of Checkmk 2.0.0 so the extension itself is quite small. 
   * Currently not possible to modify the notification body on the web interface itself. Simply because I don't need it...
   * Currently not possible to ackn an event through telegram itself. Only had some ideas about a possible architecture...
+* [Export Dashboards for sharing](README_dashboard_exporter):
+  * You may want to share your Dashboards with other users. Or you want to distribute some Dashboards to other Checkmk instances without having them strictly connected with an user. So these two exporters allow to move your custom dashboards into the local file structure of Checkmk. With that you may create one ore more MKPs.
+  * Known builtin Dashboards (such as 'main' or 'problems') are ignored by default.
+  * The apache restart is done automatically with option -a.
+  * Currently it is not possible to automatically create an MKP out out your exported dashboards.
+  * There is no validation at all, if an exported dashboard is compatible to a different version of Checkmk.
